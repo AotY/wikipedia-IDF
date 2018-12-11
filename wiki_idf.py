@@ -1,5 +1,3 @@
-from argparse import ArgumentParser
-from collections import Counter
 import logging
 import json
 import re
@@ -12,36 +10,37 @@ from nltk.tokenize import word_tokenize
 from nltk.stem.snowball import SnowballStemmer
 from bz2 import BZ2File
 from multiprocessing import Pool
+from argparse import ArgumentParser
+from collections import Counter
 
 DROP_TOKEN_RE = re.compile("^\W*$")
 
-
 def filter_tokens(tokens):
-	for t in tokens:
-		if not DROP_TOKEN_RE.match(t):
-			yield t.lower()
+    for t in tokens:
+        if not DROP_TOKEN_RE.match(t):
+            yield t.lower()
 
 
 def stem(tokens):
-	global stemmer
-	stems = []
-	token_to_stem_mapping = dict()
+    global stemmer
+    stems = []
+    token_to_stem_mapping = dict()
 
-	for t in tokens:
-		s = stemmer.stem(t)
-		stems.append(s)
-		if s not in token_to_stem_mapping:
-			token_to_stem_mapping[s] = Counter()
-		token_to_stem_mapping[s][t] += 1
+    for t in tokens:
+        s = stemmer.stem(t)
+        stems.append(s)
+        if s not in token_to_stem_mapping:
+            token_to_stem_mapping[s] = Counter()
+        token_to_stem_mapping[s][t] += 1
 
-	return set(stems), token_to_stem_mapping
+    return set(stems), token_to_stem_mapping
 
 
 def get_file_reader(filename):
-	if filename.endswith(".bz2"):
-		return BZ2File(filename)
-	else:
-		return open(filename)
+    if filename.endswith(".bz2"):
+        return BZ2File(filename)
+    else:
+        return open(filename)
 
 
 def get_lines(data_dir):
@@ -71,56 +70,65 @@ def process_line(line):
 
 
 def main():
-	global stemmer
-	parser = ArgumentParser()
-	parser.add_argument("-i", "--input", required=True, type=str,  help="data dir")
-	parser.add_argument("-s", "--stem", metavar="LANG", choices=SnowballStemmer.languages, help="Also produce list of stem words")
-	parser.add_argument("-o", "--output", metavar="OUT_BASE", required=True, help="Output CSV files base")
-	parser.add_argument("-l", "--limit", metavar="LIMIT", type=int, help="Stop after reading LIMIT articles.")
-	parser.add_argument("-c", "--cpus", default=1, type=int, help="Number of CPUs to employ.")
-	args = parser.parse_args()
+    global stemmer
+    parser = ArgumentParser()
+    parser.add_argument("-i", "--input", required=True,
+                        type=str,  help="data dir")
+    parser.add_argument("-s", "--stem", metavar="LANG",
+                        choices=SnowballStemmer.languages, help="Also produce list of stem words")
+    parser.add_argument("-o", "--output", metavar="OUT_BASE",
+                        required=True, help="Output CSV files base")
+    parser.add_argument("-l", "--limit", metavar="LIMIT",
+                        type=int, help="Stop after reading LIMIT articles.")
+    parser.add_argument("-c", "--cpus", default=1, type=int,
+                        help="Number of CPUs to employ.")
+    args = parser.parse_args()
 
-	nltk.download("punkt")
+    nltk.download("punkt")
 
-	if args.stem:
-		stemmer = SnowballStemmer(args.stem)
+    if args.stem:
+        stemmer = SnowballStemmer(args.stem)
 
-	tokens_c = Counter()
-	stems_c = Counter()
-	token_to_stem_mapping = dict()
-	articles = 0
-	pool = Pool(processes=args.cpus)
+    tokens_c = Counter()
+    stems_c = Counter()
+    token_to_stem_mapping = dict()
+    articles = 0
+    pool = Pool(processes=args.cpus)
 
-	for tokens, stems, t_to_s_mapping in pool.imap_unordered(process_line, get_lines(args.input)):
-		tokens_c.update(tokens)
-		if args.stem:
-			stems_c.update(stems)
-			for token in t_to_s_mapping:
-				if token not in token_to_stem_mapping:
-					token_to_stem_mapping[token] = Counter()
-				token_to_stem_mapping[token].update(t_to_s_mapping[token])
+    for tokens, stems, t_to_s_mapping in pool.imap_unordered(process_line, get_lines(args.input)):
+        tokens_c.update(tokens)
+        if args.stem:
+            stems_c.update(stems)
+            for token in t_to_s_mapping:
+                if token not in token_to_stem_mapping:
+                    token_to_stem_mapping[token] = Counter()
+                token_to_stem_mapping[token].update(t_to_s_mapping[token])
 
-		articles += 1
-		if not (articles % 100):
-			logging.info("Done %d articles.", articles)
-		if articles == args.limit:
-			break
+        articles += 1
+        if not (articles % 100):
+            logging.info("Done %d articles.", articles)
+        if articles == args.limit:
+            break
 
+    # 5761000
     pool.terminate()
+
     with open(os.path.join(args.output, "terms.csv"), "w") as o:
         w = csv.writer(o)
         w.writerow(("token", "frequency", "total", "idf"))
         for token, freq in tokens_c.most_common():
-            w.writerow([token, freq, articles, math.log(float(articles) / freq)])
+            w.writerow(
+                [token, freq, articles, math.log(float(articles) / freq)])
 
-	if args.stem:
+    if args.stem:
         with open(os.path.join(args.output, "stems.csv"), "w") as o:
             w = csv.writer(o)
             w.writerow(("stem", "frequency", "total", "idf", "most_freq_term"))
             for s, freq in stems_c.most_common():
-                w.writerow([s, freq, articles, math.log(articles / (1.0 + freq)), token_to_stem_mapping[s].most_common(1)[0][0]])
+                w.writerow([s, freq, articles, math.log(
+                    articles / (1.0 + freq)), token_to_stem_mapping[s].most_common(1)[0][0]])
 
 
 if __name__ == "__main__":
-	logging.basicConfig(level=logging.DEBUG)
-	sys.exit(main())
+    logging.basicConfig(level=logging.DEBUG)
+    sys.exit(main())
