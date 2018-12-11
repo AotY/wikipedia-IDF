@@ -5,12 +5,18 @@
 eg:
 ```
 wget https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2
+
+or
+wget https://dumps.wikimedia.org/zhwiki/latest/zhwiki-latest-pages-articles.xml.bz2
 ```
 
 ### 2. extractor
-Process it with: wikiextractor[https://github.com/attardi/wikiextractor]
+Process it with: [wikiextractor][https://github.com/attardi/wikiextractor]
 ```
 python WikiExtractor.py -o ./extract_dir --compress --json /path/to/enwiki-latest-pages-articles.xml.bz2
+
+or
+[中文维基百科数据处理][https://bamtercelboo.github.io/2018/05/10/wikidata_Process/]
 ```
 
 
