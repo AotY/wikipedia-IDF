@@ -1,3 +1,9 @@
+.ropeproject
+
+### Data
+*.csv
 *.pyc
 *.bz2
+
+data/
 

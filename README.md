@@ -4,29 +4,36 @@
 ### 1. downalod wiki dump
 eg:
 ```
-wget https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2
+wget https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2 -P ./data
 
 or
-wget https://dumps.wikimedia.org/zhwiki/latest/zhwiki-latest-pages-articles.xml.bz2
+wget https://dumps.wikimedia.org/zhwiki/latest/zhwiki-latest-pages-articles.xml.bz2 -P ./data
 ```
 
 ### 2. extractor
 Process it with: [wikiextractor][https://github.com/attardi/wikiextractor]
 ```
-python WikiExtractor.py -o ./extract_dir --compress --json /path/to/enwiki-latest-pages-articles.xml.bz2
+python wiki_extractor.py -o ./data/en_extract_dir --compress --json ./data/enwiki-latest-pages-articles.xml.bz2
 
 or
-[中文维基百科数据处理][https://bamtercelboo.github.io/2018/05/10/wikidata_Process/]
+
+python wiki_extractor.py -o ./data/zh_extract_dir --compress --json ./data/zhwiki-latest-pages-articles.xml.bz2
+
+参考： [中文维基百科数据处理][https://bamtercelboo.github.io/2018/05/10/wikidata_Process/]
 ```
 
 
 ### 3. IDF
 ```
-python wikipediaidf.py -i ./extract_dir -o ./idf_save_path -s english -c 4
+python wiki_idf.py -i ./data/en_extract_dir -o ./data/idf_save_path/en -lang english -s -c 6
+
+or
+
+python wiki_idf.py -i ./data/zh_extract_dir -o ./data/idf_save_path/zh -lang chinese -c 6
 ```
 
 ### 4. result
-csf format
+csv format
 ```
 token,frequency,total,idf
 the,4868104,5375019,0.09905756998426586

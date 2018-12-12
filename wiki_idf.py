@@ -6,6 +6,8 @@ import sys
 import math
 import csv
 import nltk
+import jieba
+from opencc import OpenCC
 from nltk.tokenize import word_tokenize
 from nltk.stem.snowball import SnowballStemmer
 from bz2 import BZ2File
@@ -14,6 +16,28 @@ from argparse import ArgumentParser
 from collections import Counter
 
 DROP_TOKEN_RE = re.compile("^\W*$")
+
+nltk.download("punkt")
+parser = ArgumentParser()
+parser.add_argument("-i", "--input", required=True,
+                    type=str,  help="data dir")
+
+parser.add_argument("-lang", "--language", type=str)
+
+parser.add_argument("-s", "--stem", action='store_true')
+
+parser.add_argument("-o", "--output", metavar="OUT_BASE",
+                    required=True, help="Output CSV files base")
+
+parser.add_argument("-l", "--limit", metavar="LIMIT",
+                    type=int, help="Stop after reading LIMIT articles.")
+
+parser.add_argument("-c", "--cpus", default=1, type=int,
+                    help="Number of CPUs to employ.")
+
+args = parser.parse_args()
+if args.language == 'chinese':
+    cc = OpenCC('t2s')
 
 def filter_tokens(tokens):
     for t in tokens:
@@ -64,30 +88,28 @@ def get_lines(data_dir):
 
 def process_line(line):
     article_json = json.loads(line)
-    tokens = set(filter_tokens(word_tokenize(article_json["text"])))
-    stems, token_to_stem_mapping = stem(tokens)
-    return tokens, stems, token_to_stem_mapping
+    if args.language == 'chinese':
+        text = cc.convert(article_json["text"])
+        tokens = list(jieba.cut(text))
+        tokens = [token for token in tokens if len(token.split()) > 0]
+    else:
+        tokens = set(filter_tokens(word_tokenize(article_json["text"])))
+    if args.stem:
+        stems, token_to_stem_mapping = stem(tokens)
+        return tokens, stems, token_to_stem_mapping
+    else:
+        return tokens, None, None
 
 
 def main():
     global stemmer
-    parser = ArgumentParser()
-    parser.add_argument("-i", "--input", required=True,
-                        type=str,  help="data dir")
-    parser.add_argument("-s", "--stem", metavar="LANG",
-                        choices=SnowballStemmer.languages, help="Also produce list of stem words")
-    parser.add_argument("-o", "--output", metavar="OUT_BASE",
-                        required=True, help="Output CSV files base")
-    parser.add_argument("-l", "--limit", metavar="LIMIT",
-                        type=int, help="Stop after reading LIMIT articles.")
-    parser.add_argument("-c", "--cpus", default=1, type=int,
-                        help="Number of CPUs to employ.")
-    args = parser.parse_args()
-
-    nltk.download("punkt")
+    if args.stem and args.language in SnowballStemmer.languages:
+        args.stem = True
+    else:
+        args.stem =False
 
     if args.stem:
-        stemmer = SnowballStemmer(args.stem)
+        stemmer = SnowballStemmer(args.language)
 
     tokens_c = Counter()
     stems_c = Counter()
@@ -97,6 +119,7 @@ def main():
 
     for tokens, stems, t_to_s_mapping in pool.imap_unordered(process_line, get_lines(args.input)):
         tokens_c.update(tokens)
+
         if args.stem:
             stems_c.update(stems)
             for token in t_to_s_mapping:
